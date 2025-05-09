@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { saveWalletAddress } = require('../controllers/walletController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const walletController = require('../controllers/walletController');
+const { authenticateToken } = require('../middlewares/authMiddleware');
 
-router.post('/wallet', authenticateToken, saveWalletAddress);
+// ✅ 지갑 주소 등록 (이메일 인증 없이 바로)
+router.post('/register', authenticateToken, walletController.registerWallet);
 
 module.exports = router;
