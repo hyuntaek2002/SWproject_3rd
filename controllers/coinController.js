@@ -1,8 +1,6 @@
 const db = require('../models/db');
 const { getCoinMarketData } = require('../services/coinService');
 
-
-// controllers/coinsController.js
 exports.getCoinRecommendations = async (req, res) => {
   const userId = req.user.userId;
 
@@ -31,12 +29,11 @@ exports.getCoinRecommendations = async (req, res) => {
       .sort((a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h);
 
     const oneThird = Math.ceil(sortedCoins.length / 3);
-    const attackType = sortedCoins.slice(0, oneThird);
+    const attackType  = sortedCoins.slice(0, oneThird);
     const neutralType = sortedCoins.slice(oneThird, oneThird * 2);
-    const stableType = sortedCoins.slice(oneThird * 2);
+    const stableType  = sortedCoins.slice(oneThird * 2);
 
     let recommended = [];
-
     switch (survey.risk_tolerance) {
       case '공격형':
         recommended = attackType;
@@ -56,9 +53,9 @@ exports.getCoinRecommendations = async (req, res) => {
 
     res.status(200).json({
       message: '추천 코인 목록',
-      risk_tolerance: survey.risk_tolerance,
-      investment_goal: survey.investment_goal,
-      recommendations: recommended.slice(0, 10)
+      risk_tolerance:   survey.risk_tolerance,
+      investment_goal:  survey.investment_goal,
+      recommendations:  recommended.slice(0, 10)
     });
   });
 };

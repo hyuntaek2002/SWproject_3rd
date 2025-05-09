@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-// 인증 토큰 검증 미들웨어
-exports.authenticateToken = (req, res, next) => {
+// 인증 토큰 검증 미들웨어 (기존 로직 그대로 유지)
+function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -19,4 +19,7 @@ exports.authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
-};
+}
+
+// ✅ module.exports 로 함수 자체를 내보냅니다
+module.exports = authenticateToken;

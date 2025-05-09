@@ -1,12 +1,16 @@
+// routes/surveyRoutes.js
+
 const express = require('express');
 const router = express.Router();
-const surveyController = require('../controllers/surveyController');
-const { authenticateToken } = require('../middlewares/authMiddleware');
 
-// 설문 저장
-router.post('/survey', authenticateToken, surveyController.submitSurvey)
+// 컨트롤러 함수 — 이 부분은 실제 이름에 맞게 조정하세요
+const { submitSurvey } = require('../controllers/surveyController');
 
-// 주식 추천
-router.get('/recommendations', authenticateToken, surveyController.getRecommendations)
+// authMiddleware.js에서 module.exports = authenticateToken; 로 내보냈다면
+// require() 자체가 함수가 됩니다.
+const authenticate = require('../middleware/authMiddleware');
 
-module.exports = router
+// POST /api/surveys
+router.post('/', authenticate, submitSurvey);
+
+module.exports = router;

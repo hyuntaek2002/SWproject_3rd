@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const walletController = require('../controllers/walletController');
-const { authenticateToken } = require('../middlewares/authMiddleware');
 
-// ✅ 지갑 주소 등록 (이메일 인증 없이 바로)
-router.post('/register', authenticateToken, walletController.registerWallet);
+// 미들웨어는 module.exports 로 내보낸 함수 전체를 require 로 가져옵니다
+const authenticateToken = require('../middleware/authMiddleware');
+
+// 컨트롤러 함수 (기존 로직 그대로)
+const { saveWalletAddress } = require('../controllers/walletController');
+
+// POST /api/wallet
+router.post('/', authenticateToken, saveWalletAddress);
+
 
 module.exports = router;
+
