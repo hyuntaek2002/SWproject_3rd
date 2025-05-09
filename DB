@@ -1,0 +1,115 @@
+-- 1. 데이터베이스 생성
+CREATE DATABASE IF NOT EXISTS finance_app
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_general_ci;
+USE finance_app;
+
+-- 2. 사용자 테이블
+CREATE TABLE IF NOT EXISTS users (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  email           VARCHAR(255)      NOT NULL UNIQUE,
+  password        VARCHAR(255)      NOT NULL,
+  wallet_address  VARCHAR(255),
+  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3. 설문 결과 테이블
+CREATE TABLE IF NOT EXISTS survey_results (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  user_id          INT                NOT NULL,
+  risk_tolerance   VARCHAR(50)        NOT NULL,
+  investment_goal  VARCHAR(100)       NOT NULL,
+  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  INDEX idx_survey_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4. 실시간 주식 데이터 저장 테이블
+CREATE TABLE IF NOT EXISTS stocks (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  symbol          VARCHAR(10)        NOT NULL,
+  price           DECIMAL(10,2)      NOT NULL,
+  change_percent  DECIMAL(5,2)       NOT NULL,
+  fetched_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_stocks_symbol (symbol)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5. 추천 주식 로그 테이블
+CREATE TABLE IF NOT EXISTS stock_recommendations (
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  survey_result_id  INT                NOT NULL,
+  stock_name        VARCHAR(100)       NOT NULL,
+  reason            TEXT,
+  created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (survey_result_id)
+    REFERENCES survey_results(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  INDEX idx_rec_survey (survey_result_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 6. 사용자 자산 테이블
+CREATE TABLE IF NOT EXISTS user_assets (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT                     NOT NULL,
+  symbol     VARCHAR(10)             NOT NULL,
+  quantity   DECIMAL(18,8)           NOT NULL,
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  INDEX idx_assets_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 7. 거래 테이블 (transactions)
+CREATE TABLE IF NOT EXISTS transactions (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  user_id          INT                    NOT NULL,
+  type             ENUM('income','expense') NOT NULL,
+  category         VARCHAR(50),
+  amount           DECIMAL(10,2)          NOT NULL,
+  memo             TEXT,
+  transaction_date DATE                   NOT NULL,
+  is_fixed         BOOLEAN DEFAULT FALSE,
+  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  INDEX idx_trans_user_date (user_id, transaction_date),
+  INDEX idx_trans_fixed (is_fixed)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 8. 수동 고정 지출 관리 테이블 (fixed_expenses)
+CREATE TABLE IF NOT EXISTS fixed_expenses (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT                   NOT NULL,
+  category     VARCHAR(50)           NOT NULL,
+  amount       DECIMAL(10,2)         NOT NULL,
+  memo         TEXT,
+  day_of_month INT                   NOT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  INDEX idx_fixed_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 9. 목표 지출 관리 테이블 (goals)
+CREATE TABLE IF NOT EXISTS goals (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT                   NOT NULL,
+  month      CHAR(7)               NOT NULL,  -- 'YYYY-MM'
+  amount     INT                   NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_goals_user_month (user_id, month),
+  FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  INDEX idx_goals_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
