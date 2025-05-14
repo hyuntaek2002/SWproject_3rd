@@ -827,6 +827,7 @@ button {
   margin-top: 12px;
 }
 
+/*새로고침 버튼 제거*/
 .refresh-button {
   position: static; /* 기존 absolute 제거 */
   background-color: var(--primary-color);
@@ -841,4 +842,83 @@ button {
 
 .refresh-button:hover {
   background-color: #2272eb;
+}
+
+.progress-fill-warning {
+  background-color: #ffb347; /* 부드러운 주황색 */
+}
+
+/* 예측 방식 배지 */
+.prediction-badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  margin-left: 10px;
+  vertical-align: middle;
+  font-weight: 500;
+}
+
+.prediction-badge.ml {
+  background-color: #3182f6;
+  color: white;
+}
+
+.prediction-badge.gpt {
+  background-color: #10b981;
+  color: white;
+}
+
+/* 예측 정보 스타일 */
+.prediction-info {
+  margin-top: 15px;
+  padding: 10px 15px;
+  background-color: var(--gray-100);
+  border-radius: var(--radius-md);
+}
+
+.prediction-note {
+  font-size: 14px;
+  color: var(--gray-700);
+  margin: 0;
+}
+
+/* 데이터 불충분 메시지 */
+.insufficient-data {
+  padding: 20px;
+  text-align: center;
+  background-color: var(--gray-100);
+  border-radius: var(--radius-md);
+  margin-top: 15px;
+  color: var(--gray-700);
+}
+
+/* 정확도 표시 스타일 */
+.accuracy-meter {
+  margin-top: 15px;
+  padding: 10px 15px;
+  background-color: var(--primary-light);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+}
+
+.accuracy-label {
+  font-size: 14px;
+  color: var(--gray-800);
+  margin-right: 15px;
+}
+
+.accuracy-bar {
+  flex-grow: 1;
+  height: 8px;
+  background-color: var(--gray-300);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.accuracy-fill {
+  height: 100%;
+  background-color: var(--primary-color);
+  border-radius: 4px;
 }

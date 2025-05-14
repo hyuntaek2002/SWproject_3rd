@@ -30,7 +30,8 @@ const CalendarPage = () => {
   const [comparisonData, setComparisonData] = useState({ current: [], previous: [] });
   const [goalAmount, setGoalAmount] = useState(null);
   const [goalFeedback, setGoalFeedback] = useState('');
-  
+  const [monthlyTotals, setMonthlyTotals] = useState([]);
+  const [predictionMethod, setPredictionMethod] = useState('none');
   // 분석 관련 상태들
   const [categoryStats, setCategoryStats] = useState([]);
   const [spendingFeedback, setSpendingFeedback] = useState('');
@@ -79,29 +80,87 @@ const CalendarPage = () => {
 
   // 지출 예측 가져오기
   const fetchPrediction = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/api/ai/predict-spending', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id })
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      const data = await res.json();
-      const formatted = data.history.map(item => ({
-        name: `${parseInt(item.month.split('-')[1])}월`,
-        amount: Number(item.total)
-      }));
-      
-      formatted.push({ name: '다음달', amount: data.prediction });
-      setSpendingPrediction(formatted);
-    } catch (error) {
-      console.error('지출 예측 가져오기 실패:', error);
-      // 오류 시 빈 예측 데이터 설정
-      setSpendingPrediction([]);
+  try {
+    // 새로운 머신러닝 API 사용
+    const res = await fetch('http://localhost:5000/api/ml/predict-spending', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id })
+    });
+    
+    if (!res.ok) {
+      // 만약 ML API가 실패하면 fallback으로 기존 GPT API 사용
+      console.warn('머신러닝 예측 실패, GPT 예측으로 대체합니다.');
+      return fetchGptPrediction();
     }
-  };
+    
+    const data = await res.json();
+    
+    // 데이터 형식 변환
+    const formatted = data.history.map(item => ({
+      name: `${parseInt(item.month.split('-')[1])}월`,
+      amount: Number(item.total)
+    }));
+    
+    // 예측 결과 추가
+    if (data.prediction !== null) {
+      formatted.push({ 
+        name: '다음달(ML)', 
+        amount: data.prediction,
+        fill: '#8884d8'  // 특별한 색상으로 표시
+      });
+    }
+    
+    setSpendingPrediction(formatted);
+    
+    // 예측 방식 표시
+    setPredictionMethod('machine_learning');
+    
+  } catch (error) {
+    console.error('지출 예측 가져오기 실패:', error);
+    // 오류 시 GPT API로 fallback
+    fetchGptPrediction();
+  }
+};
+
+// 기존 GPT 기반 예측 함수 - fallback으로 사용
+const fetchGptPrediction = async () => {
+  try {
+    const res = await fetch('http://localhost:5000/api/ai/predict-spending', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id })
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    
+    const data = await res.json();
+    
+    const formatted = data.history.map(item => ({
+      name: `${parseInt(item.month.split('-')[1])}월`,
+      amount: Number(item.total)
+    }));
+    
+    formatted.push({ 
+      name: '다음달(GPT)', 
+      amount: data.prediction,
+      fill: '#82ca9d'  // GPT 예측은 다른 색상으로 표시
+    });
+    
+    setSpendingPrediction(formatted);
+    
+    // 예측 방식 표시
+    setPredictionMethod('gpt');
+    
+  } catch (error) {
+    console.error('GPT 지출 예측 가져오기 실패:', error);
+    // 오류 시 빈 예측 데이터 설정
+    setSpendingPrediction([]);
+    setPredictionMethod('none');
+  }
+};
 
   // 월별 지출 비교 가져오기
   const fetchMonthlyComparison = async () => {
@@ -261,64 +320,97 @@ const CalendarPage = () => {
     }
   };
 
+  const fetchMonthlyTotals = async () => {
+  try {
+    // 최근 6개월 데이터를 가져오기 위한 API 호출
+    const res = await fetch(`http://localhost:5000/api/transactions/monthly-totals?user_id=${user_id}`);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    const data = await res.json();
+    setMonthlyTotals(data.totals);
+  } catch (error) {
+    console.error('월별 총액 가져오기 실패:', error);
+    
+    // API 실패 시 더미 데이터 생성
+    const now = new Date();
+    const dummyData = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = monthDate.toLocaleString('default', { month: 'short' });
+      const yearMonth = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      // 현재 달에 가까울수록 지출이 증가하는 패턴의 더미 데이터 생성
+      const baseExpense = 500000 + Math.random() * 300000;
+      const expenseVariance = Math.random() * 0.3 - 0.15; // -15%~+15% 변동성
+      const expense = Math.round(baseExpense * (1 + i * 0.05 + expenseVariance));
+      
+      // 수입 데이터도 추가
+      const baseIncome = 800000 + Math.random() * 400000;
+      const incomeVariance = Math.random() * 0.2 - 0.1; // -10%~+10% 변동성
+      const income = Math.round(baseIncome * (1 + i * 0.03 + incomeVariance));
+      
+      dummyData.push({
+        month: monthName,
+        yearMonth: yearMonth,
+        expense: expense,
+        income: income
+      });
+    }
+    
+    setMonthlyTotals(dummyData);
+  }
+};
+
   // 월별 수입/지출 비교 및 GPT 분석 가져오기
   const fetchMonthlyFeedback = async () => {
-    try {
-      const res = await fetch(`http://localhost:5000/api/transactions/ai/monthly-feedback?user_id=${user_id}&month=${year}-${month}`);
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      const data = await res.json();
-      setMonthlyFeedback({
-        summary: data.summary || '',
-        feedback: data.feedback || ''
-      });
-    } catch (error) {
-      console.error('월별 피드백 가져오기 실패:', error);
-      
-      // API 호출 실패 시 더미 데이터 생성
-      const currentIncome = Number(summary.income_total || 0);
-      const currentExpense = Number(summary.expense_total || 0);
-      
-      // 가상의 지난달 데이터
-      const prevMonth = new Date();
-      prevMonth.setMonth(prevMonth.getMonth() - 1);
-      const prevMonthStr = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
-      
-      // 지난달 데이터 (랜덤하게 생성)
-      const prevIncome = Math.floor(currentIncome * (0.8 + Math.random() * 0.4)); // 현재의 80~120%
-      const prevExpense = Math.floor(currentExpense * (0.8 + Math.random() * 0.4)); // 현재의 80~120%
-      
-      // 월별 요약 생성
-      const summaryText = `
-[이번 달 (${year}-${month})]
-- 수입: ${currentIncome.toLocaleString()}원
-- 지출: ${currentExpense.toLocaleString()}원
-
-[지난 달 (${prevMonthStr})]
-- 수입: ${prevIncome.toLocaleString()}원
-- 지출: ${prevExpense.toLocaleString()}원
-      `;
-      
-      // 가상의 GPT 피드백 생성
-      let feedbackText = '';
-      
-      if (currentExpense > prevExpense) {
-        const increasePercent = ((currentExpense - prevExpense) / prevExpense * 100).toFixed(1);
-        feedbackText = `이번 달은 지난달보다 지출이 ${increasePercent}% 증가했어요. 💸 특히 큰 금액의 지출이 있었네요. 다음 달에는 예산 계획을 좀 더 세부적으로 세워보는 건 어떨까요?`;
-      } else {
-        const decreasePercent = ((prevExpense - currentExpense) / prevExpense * 100).toFixed(1);
-        feedbackText = `잘하셨어요! 이번 달은 지난달보다 지출이 ${decreasePercent}% 감소했습니다. ✨ 절약 습관이 자리잡고 있는 것 같아요. 이대로 계속 관리해보세요!`;
-      }
-      
-      setMonthlyFeedback({
-        summary: summaryText,
-        feedback: feedbackText
-      });
-      
-      console.log("더미 데이터로 월별 피드백 생성 완료");
+  try {
+    // API 경로를 올바르게 수정
+    const res = await fetch(`http://localhost:5000/api/transactions/ai/monthly-feedback?user_id=${user_id}&month=${year}-${month}`);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
     }
-  };
+    const data = await res.json();
+    setMonthlyFeedback({
+      summary: data.summary || '',
+      feedback: data.feedback || ''
+    });
+  } catch (error) {
+    console.error('월별 피드백 가져오기 실패:', error);
+    
+    // API 호출 실패 시 대체 데이터 생성
+    // 현재 월 데이터 사용
+    const currentIncome = Number(summary.income_total || 0);
+    const currentExpense = Number(summary.expense_total || 0);
+    
+    // 지난달 계산
+    const prevMonth = new Date();
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const prevMonthStr = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+    
+    // 간단한 대체 데이터
+    const summaryText = `
+      [이번 달 (${year}-${month})]
+      - 수입: ${currentIncome.toLocaleString()}원
+      - 지출: ${currentExpense.toLocaleString()}원
+
+      [지난 달 (${prevMonthStr})]
+      - 수입: 데이터 없음
+      - 지출: 데이터 없음
+    `;
+    
+    // 기본 피드백 메시지
+    const feedbackText = '월별 피드백을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    
+    setMonthlyFeedback({
+      summary: summaryText,
+      feedback: feedbackText
+    });
+    
+    console.log("API 오류로 기본 피드백 생성됨");
+  }
+};
 
   useEffect(() => {
     fetchTransactions();
@@ -330,6 +422,7 @@ const CalendarPage = () => {
     fetchCategoryStatistics();
     fetchSpendingFeedback();
     fetchMonthlyFeedback();
+    fetchMonthlyTotals();
   }, [selectedDate]);
 
   const handleSubmit = async () => {
@@ -615,8 +708,14 @@ const CalendarPage = () => {
             {goalAmount && (
               <div className="goal-progress-container">
                 <div className="progress-bar">
-                  <div 
-                    className={`progress-fill ${summary.expense_total > goalAmount ? 'progress-fill-danger' : 'progress-fill-safe'}`}
+                  <div
+                    className={`progress-fill ${
+                      summary.expense_total > goalAmount
+                        ? 'progress-fill-danger'
+                        : (summary.expense_total / goalAmount >= 0.8
+                          ? 'progress-fill-warning'
+                          : 'progress-fill-safe')
+                    }`}
                     style={{ width: `${Math.min(100, (summary.expense_total / goalAmount) * 100)}%` }}
                   />
                 </div>
@@ -652,7 +751,7 @@ const CalendarPage = () => {
               <ul>
                 {searchResults.map((t, i) => (
                   <li key={i}>
-                    {t.transaction_date} - {t.category} - {t.amount}원 ({t.memo})
+                    {new Date(t.transaction_date).toLocaleDateString()} - {t.category} - {Math.round(t.amount).toLocaleString()}원 ({t.memo})
                   </li>
                 ))}
               </ul>
@@ -723,7 +822,7 @@ const CalendarPage = () => {
                         [{tx.type === 'income' ? '수입' : '지출'}]
                       </span> {tx.category} - 
                       <span className="transaction-amount">
-                        {tx.amount.toLocaleString()}원
+                        {Math.round(tx.amount).toLocaleString()}원
                       </span> ({tx.memo})
                     </div>
                     <div className="transaction-buttons">
@@ -760,8 +859,14 @@ const CalendarPage = () => {
               <div className="ai-insight-card">
                 <div className="goal-progress-container">
                   <div className="progress-bar">
-                    <div 
-                      className={`progress-fill ${summary.expense_total > goalAmount ? 'progress-fill-danger' : 'progress-fill-safe'}`}
+                    <div
+                      className={`progress-fill ${
+                        summary.expense_total > goalAmount
+                          ? 'progress-fill-danger'
+                          : (summary.expense_total / goalAmount >= 0.8
+                            ? 'progress-fill-warning'
+                            : 'progress-fill-safe')
+                        }`}
                       style={{ width: `${Math.min(100, (summary.expense_total / goalAmount) * 100)}%` }}
                     />
                   </div>
@@ -835,11 +940,6 @@ const CalendarPage = () => {
                     <p>분석 데이터를 불러오는 중입니다...</p>
                   )}
                 </div>
-                <div className="ai-insight-button-area">
-                  <button className="refresh-button" onClick={fetchSpendingFeedback}>
-                  새로고침
-                </button>
-                </div>
               </div>
             </div>
           </div>
@@ -896,39 +996,78 @@ const CalendarPage = () => {
           <div className="ai-insight-section">
             <h3>📊 월간 재정 분석</h3>
             <div className="ai-insight-card">
+              {monthlyTotals.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={monthlyTotals}
+                    margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis tickFormatter={(v) => `${v.toLocaleString()}`} />
+                    <Tooltip formatter={(value) => `${Number(value).toLocaleString()}원`} />
+                    <Legend />
+                    <Bar dataKey="income" fill={COLORS[0]} name="수입" />
+                    <Bar dataKey="expense" fill={COLORS[3]} name="지출" />
+                  </BarChart>
+                </ResponsiveContainer>
+                ) : (
+                <div className="no-data-message" style={{ padding: '40px 0', textAlign: 'center' }}>
+                  <p>월별 거래 데이터가 없습니다.</p>
+                  <p>거래를 입력하면 월별 수입/지출 차트가 생성됩니다.</p>
+                </div>
+              )}
+
               <div className="ai-insight-summary">
                 <h4>요약</h4>
-                <pre>{monthlyFeedback.summary}</pre>
+                  <pre>{monthlyFeedback.summary || '월별 데이터를 불러오는 중...'}</pre>
               </div>
+
               <div className="ai-insight-content">
                 <h4>분석</h4>
-                {monthlyFeedback.feedback ? (
-                  <p>{monthlyFeedback.feedback}</p>
-                ) : (
-                  <p>분석 데이터를 불러오는 중입니다...</p>
-                )}
+                  <p>{monthlyFeedback.feedback || '분석 데이터를 불러오는 중...'}</p>
               </div>
-              <button className="refresh-button" onClick={fetchMonthlyFeedback}>
-                새로고침
-              </button>
             </div>
           </div>
 
           {/* 지출 예측 그래프 */}
           <div className="chart-section">
-            <h3>📊 지출 예측 그래프</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={spendingPrediction}
-              margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis tickFormatter={formatCurrency} />
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Legend />
-                <Bar dataKey="amount" fill="#8884d8" name="지출 금액" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+  <h3>
+    📊 지출 예측 그래프 
+    {predictionMethod === 'machine_learning' && <span className="prediction-badge ml">머신러닝</span>}
+    {predictionMethod === 'gpt' && <span className="prediction-badge gpt">GPT</span>}
+  </h3>
+  
+  <ResponsiveContainer width="100%" height={300}>
+    <BarChart data={spendingPrediction}
+    margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="name" />
+      <YAxis tickFormatter={formatCurrency} />
+      <Tooltip formatter={(value) => formatCurrency(value)} />
+      <Legend />
+      <Bar dataKey="amount" name="지출 금액" fill="#8884d8">
+        {spendingPrediction.map((entry, index) => (
+          <Cell 
+            key={`cell-${index}`} 
+            fill={entry.fill || (index === spendingPrediction.length - 1 ? '#ff7300' : '#8884d8')}
+          />
+        ))}
+      </Bar>
+    </BarChart>
+  </ResponsiveContainer>
+  
+  <div className="prediction-info">
+    {predictionMethod === 'machine_learning' && (
+      <p className="prediction-note">
+        머신러닝 모델이 지난 데이터를 분석하여 다음 달 지출을 예측했습니다.
+      </p>
+    )}
+    {predictionMethod === 'gpt' && (
+      <p className="prediction-note">
+        GPT 모델이 지난 데이터를 분석하여 다음 달 지출을 예측했습니다.
+      </p>
+    )}
+  </div>
+</div>
           
           {/* 고정 지출 내역 */}
           <div className="fixed-expenses">
